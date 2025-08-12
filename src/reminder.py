@@ -1,5 +1,6 @@
 import os
 import json
+import uuid
 from datetime import datetime
 
 import google.generativeai as genai
@@ -32,6 +33,7 @@ class Reminder:
             }
         )
         self.prompt_renderer = PromptRenderer(strict=True, debug=False)
+        self.session_id = None
 
     def _get_structured_completion(self, prompt: str) -> Response:
         """Get structured completion from Google Gemini API"""
@@ -41,21 +43,30 @@ class Reminder:
         parsed = json.loads(response.text)
         return Response(**parsed)
 
-    def _save(self, todo_list: list[TodoItem]):
-        """Save the reminder to a persistent storage (e.g., database or file)"""
-        with open("reminder.jsonl", "a") as f:
+    def _save(self, transcript: str, todo_list: list[TodoItem]):
+        """Save the reminder to a persistent storage """
+        with open("reminder_items.jsonl", "a") as f:
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             for item in todo_list:
-                created_at = now
                 description = item.description
                 setting_time = item.time
                 f.write(json.dumps({
-                    "created_at": created_at,
+                    "session_id": self.session_id,
+                    "created_at": now,
                     "description": description,
                     "setting_time": setting_time
                 }, ensure_ascii=False) + "\n")
 
+        with open("reminder_transcript.jsonl", "a") as f:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            f.write(json.dumps({
+                "session_id": self.session_id,
+                "created_at": now,
+                "transcript": transcript
+            }, ensure_ascii=False) + "\n")
+
     def run(self, text: str):
+        self.session_id = str(uuid.uuid4())
         system_prompt = self.prompt_renderer.render("reminder")
         now = datetime.now()
         formatted_time = now.strftime("%Y-%m-%d %I:%M %p %A")
